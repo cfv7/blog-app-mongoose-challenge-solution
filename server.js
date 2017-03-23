@@ -2,9 +2,10 @@ const bodyParser = require('body-parser');
 const express = require('express');
 const mongoose = require('mongoose');
 const morgan = require('morgan');
+const bcrypt = require('bcryptjs');
 
 const {DATABASE_URL, PORT} = require('./config');
-const {BlogPost} = require('./models');
+const {BlogPost, User} = require('./models');
 
 const app = express();
 
@@ -61,6 +62,39 @@ app.post('/posts', (req, res) => {
         res.status(500).json({error: 'Something went wrong'});
     });
 
+});
+
+
+app.post('/users', (req, res) => {
+  let {username, password, firstName, lastName} = req.body;
+
+  User 
+    // return User 
+  .find({username})
+  .count()
+  .exec()
+  .then(count => {
+    if (count > 0) {
+      return res.status(400).json({message: 'username taken 😞'})
+    }
+    return User.hashPassword(password)
+    console.log(password)
+  })
+  .then(hash => {
+    return User
+    .create({
+      username: req.body.username,
+      password: req.body.password,
+      firstName: req.body.firstName,
+      lastName: req.body.lastName
+    })
+  })
+  .then(user => {
+    return res.status(201).json(user.apiRepr());
+  })  
+  .catch(err => {
+    res.status(500).json({message: 'Internal server error 😌'})
+  });
 });
 
 
