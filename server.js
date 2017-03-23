@@ -3,9 +3,12 @@ const express = require('express');
 const mongoose = require('mongoose');
 const morgan = require('morgan');
 const bcrypt = require('bcryptjs');
-
+const passport = require('passport');
+const {BasicStrategy} = require('passport-http');
 const {DATABASE_URL, PORT} = require('./config');
 const {BlogPost, User} = require('./models');
+const auth = passport.authenticate('basic', {session: false});
+
 
 const app = express();
 
@@ -14,8 +17,7 @@ app.use(bodyParser.json());
 
 mongoose.Promise = global.Promise;
 
-
-app.get('/posts', (req, res) => {
+app.get('/posts', auth, (req, res) => {
   BlogPost
     .find()
     .exec()
@@ -28,7 +30,8 @@ app.get('/posts', (req, res) => {
     });
 });
 
-app.get('/posts/:id', (req, res) => {
+app.get('/posts/:id',  auth, (req, res) => {
+
   BlogPost
     .findById(req.params.id)
     .exec()
@@ -39,8 +42,8 @@ app.get('/posts/:id', (req, res) => {
     });
 });
 
-app.post('/posts', (req, res) => {
-  const requiredFields = ['title', 'content', 'author'];
+app.post('/posts', auth, (req, res) => {
+  const requiredFields = ['title', 'content'];
   for (let i=0; i<requiredFields.length; i++) {
     const field = requiredFields[i];
     if (!(field in req.body)) {
@@ -54,7 +57,7 @@ app.post('/posts', (req, res) => {
     .create({
       title: req.body.title,
       content: req.body.content,
-      author: req.body.author
+      author: {firstName: req.user.firstName, lastName: req.user.lastName}
     })
     .then(blogPost => res.status(201).json(blogPost.apiRepr()))
     .catch(err => {
@@ -63,6 +66,38 @@ app.post('/posts', (req, res) => {
     });
 
 });
+
+const basicStrategy = new BasicStrategy((username, password, callback) => {
+  console.log('basic strategy called');
+  let user;
+  User
+    .findOne({username: username})
+    .exec()
+    .then(_user => {
+      console.log("user", _user)
+      user = _user;
+      if(!user) {
+        return callback(null, false, {message: 'Incorrect username 🕵️‍'});
+      }
+      return user.validatePassword(password);
+    })
+    .then(isValid => {
+      console.log("isValid", isValid)
+      if (!isValid) {
+        return callback(null, false, {message: 'Incorrect password 🙅‍'});
+      }
+      else {
+        return callback(null, user)
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      return callback(err);
+    }); 
+});
+
+passport.use(basicStrategy);
+app.use(passport.initialize());
 
 
 app.post('/users', (req, res) => {
@@ -83,22 +118,59 @@ app.post('/users', (req, res) => {
   .then(hash => {
     return User
     .create({
-      username: req.body.username,
-      password: req.body.password,
-      firstName: req.body.firstName,
-      lastName: req.body.lastName
+      username: username.trim(),
+      password: hash,
+      firstName: firstName,
+      lastName: lastName
     })
   })
   .then(user => {
     return res.status(201).json(user.apiRepr());
   })  
   .catch(err => {
+    console.log(err);
     res.status(500).json({message: 'Internal server error 😌'})
   });
+
+  if (!req.body) {
+    return res.status(400).json({message: 'No request body'});
+  }
+  if (!('username' in req.body)) {
+    return res.status(422).json({message: 'Missing field: username'});
+  }
+  if (typeof username !== 'string') {
+    return res.status(422).json({message: 'Incorrect field type: username'});
+  }
+  console.log(username)
+  if (username === '') {
+    return res.status(422).json({message: 'Incorrect field length: username'});
+  }
+  if (!(password)) {
+    return res.status(422).json({message: 'Missing field: password'})
+  }
+  if (typeof password !== 'string') {
+    return res.status(422).json({message: 'Incorrect field type: password'});
+  }
+  if (password === '') {
+    return res.status(422).json({message: 'Incorrect field length: password'});
+  }
 });
 
+app.get('/users', (req, res) => {
+  return User
+    .find()
+    .exec()
+    .then(users => res.json(users.map(user => user.apiRepr())))
+    .catch(err => console.log(err) && res.status(500).json({message: 'Internal server error 🐳'}))
+});
 
-app.delete('/posts/:id', (req, res) => {
+// app.get('/users/me', 
+//   passport.authenticate('basic', {session: false}),
+//   (req, res) => res.json({user: req.user.apiRepr()})
+// ) {;
+
+app.delete('/posts/:id', auth, (req, res) => {
+  
   BlogPost
     .findByIdAndRemove(req.params.id)
     .exec()
@@ -112,7 +184,7 @@ app.delete('/posts/:id', (req, res) => {
 });
 
 
-app.put('/posts/:id', (req, res) => {
+app.put('/posts/:id', auth, (req, res) => {
   if (!(req.params.id && req.body.id && req.params.id === req.body.id)) {
     res.status(400).json({
       error: 'Request path id and request body id values must match'
@@ -135,15 +207,15 @@ app.put('/posts/:id', (req, res) => {
 });
 
 
-app.delete('/:id', (req, res) => {
-  BlogPosts
-    .findByIdAndRemove(req.params.id)
-    .exec()
-    .then(() => {
-      console.log(`Deleted blog post with id \`${req.params.ID}\``);
-      res.status(204).end();
-    });
-});
+// app.delete('/:id', (req, res) => {
+//   BlogPosts
+//     .findByIdAndRemove(req.params.id)
+//     .exec()
+//     .then(() => {
+//       console.log(`Deleted blog post with id \`${req.params.ID}\``);
+//       res.status(204).end();
+//     });
+// });
 
 
 app.use('*', function(req, res) {
