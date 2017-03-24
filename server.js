@@ -43,7 +43,7 @@ app.get('/posts/:id',  auth, (req, res) => {
 });
 
 app.post('/posts', auth, (req, res) => {
-  const requiredFields = ['title', 'content'];
+  const requiredFields = ['title', 'content', 'author'];
   for (let i=0; i<requiredFields.length; i++) {
     const field = requiredFields[i];
     if (!(field in req.body)) {
@@ -58,6 +58,7 @@ app.post('/posts', auth, (req, res) => {
       title: req.body.title,
       content: req.body.content,
       author: {firstName: req.user.firstName, lastName: req.user.lastName}
+      // author: req.body.author
     })
     .then(blogPost => res.status(201).json(blogPost.apiRepr()))
     .catch(err => {
@@ -185,11 +186,11 @@ app.delete('/posts/:id', auth, (req, res) => {
 
 
 app.put('/posts/:id', auth, (req, res) => {
-  if (!(req.params.id && req.body.id && req.params.id === req.body.id)) {
-    res.status(400).json({
-      error: 'Request path id and request body id values must match'
-    });
-  }
+  // if (req.params.id !== req.body.id) {
+  //   res.status(400).json({
+  //     error: 'Request path id and request body id values must match'
+  //   });
+  // }
 
   const updated = {};
   const updateableFields = ['title', 'content', 'author'];

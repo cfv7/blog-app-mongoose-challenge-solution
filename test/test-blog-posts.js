@@ -8,11 +8,20 @@ const mongoose = require('mongoose');
 const should = chai.should();
 
 const {DATABASE_URL} = require('../config');
-const {BlogPost} = require('../models');
+const {BlogPost, User} = require('../models');
 const {closeServer, runServer, app} = require('../server');
 const {TEST_DATABASE_URL} = require('../config');
 
 chai.use(chaiHttp);
+
+const regPass = "master";
+const hashPass = User.hashPassword(regPass);
+const userMaster = {
+  username: "master",
+  password: regPass,
+  firstName: "master",
+  lastName: "commander"
+}
 
 // this function deletes the entire database.
 // we'll call it in an `afterEach` block below
@@ -50,6 +59,25 @@ function seedBlogPostData() {
   return BlogPost.insertMany(seedData);
 }
 
+function seedUser(userMaster) {
+  console.info('seeding user data');
+  return User.hashPassword(regPass)
+  .then(hash => {
+    return User
+    .create({
+      username: userMaster.username,
+      password: hash,
+      firstName: userMaster.firstName,
+      lastName: userMaster.lastName
+    })
+    .then( user => {
+      console.log(user);
+    })
+  })
+  .catch(err => {
+    console.error(err);
+  });
+}
 
 describe('blog posts API resource', function() {
 
@@ -58,7 +86,9 @@ describe('blog posts API resource', function() {
   });
 
   beforeEach(function() {
-    return seedBlogPostData();
+    var seedUserPromise = seedUser(userMaster);
+    var seedBlogPostPromise = seedBlogPostData();
+    return Promise.all([seedUserPromise, seedBlogPostPromise])  
   });
 
   afterEach(function() {
@@ -85,6 +115,7 @@ describe('blog posts API resource', function() {
       let res;
       return chai.request(app)
         .get('/posts')
+        .auth(userMaster.username, regPass)
         .then(_res => {
           res = _res;
           res.should.have.status(200);
@@ -106,6 +137,7 @@ describe('blog posts API resource', function() {
       let resPost;
       return chai.request(app)
         .get('/posts')
+        .auth(userMaster.username, regPass)
         .then(function(res) {
 
           res.should.have.status(200);
@@ -140,14 +172,15 @@ describe('blog posts API resource', function() {
       const newPost = {
           title: faker.lorem.sentence(),
           author: {
-            firstName: faker.name.firstName(),
-            lastName: faker.name.lastName(),
+            firstName: userMaster.firstName,
+            lastName: userMaster.lastName,
           },
           content: faker.lorem.text()
       };
 
       return chai.request(app)
         .post('/posts')
+        .auth(userMaster.username, regPass)
         .send(newPost)
         .then(function(res) {
           res.should.have.status(201);
@@ -197,6 +230,7 @@ describe('blog posts API resource', function() {
 
           return chai.request(app)
             .put(`/posts/${post.id}`)
+            .auth(userMaster.username, regPass)
             .send(updateData);
         })
         .then(res => {
@@ -234,7 +268,9 @@ describe('blog posts API resource', function() {
         .exec()
         .then(_post => {
           post = _post;
-          return chai.request(app).delete(`/posts/${post.id}`);
+          return chai.request(app)
+            .delete(`/posts/${post.id}`)
+            .auth(userMaster.username, regPass)
         })
         .then(res => {
           res.should.have.status(204);
