@@ -71,7 +71,7 @@ function seedUser(userMaster) {
       lastName: userMaster.lastName
     })
     .then( user => {
-      console.log(user);
+      // console.log(user);
     })
   })
   .catch(err => {
@@ -106,6 +106,24 @@ describe('blog posts API resource', function() {
   // on proving something small
   describe('GET endpoint', function() {
 
+    it('should make sure restricted endpoints return unauthorized for bad credentials', function(){
+      return BlogPost.findOne({})
+      .then(randomPost => {
+        console.log(randomPost);
+        return chai.request(app)
+        .get(`/posts/${randomPost._id}`)
+        // .auth(userMaster.username, regPass)
+        .auth("", "m")
+      })
+      // .then(res => {
+      //   res.should.have.status(401);
+      // })
+      .catch(err => {
+        // console.error(err);
+        err.should.have.status(401);
+      });  
+    });
+    
     it('should return all existing posts', function() {
       // strategy:
       //    1. get back all posts returned by by GET request to `/posts`
@@ -167,6 +185,39 @@ describe('blog posts API resource', function() {
     // then prove that the post we get back has
     // right keys, and that `id` is there (which means
     // the data was inserted into db)
+    it('should add a new user', function(){
+      console.log("newUser function running")
+      const newUser = {
+        username: "davey_c",
+        password: "sierramountains",
+        firstName: "davey",
+        lastName: "crocket"
+      };
+      
+      return chai.request(app)
+        .post('/users')
+        .send(newUser)
+        .then(function(res) {
+          console.log(newUser);
+          res.should.have.status(201);
+          res.should.be.json;  
+          res.body.should.be.a('object');
+          // res.body.should.include.keys('id', 'username', 'password', 'firstName', 'lastName');
+          res.body.username.should.equal(newUser.username);
+          // res.body.password.should.equal(newUser.password);
+          res.body.id.should.not.be.null;
+          res.body.firstName.should.equal(newUser.firstName);
+          res.body.lastName.should.equal(newUser.lastName);
+          return User.findById(res.body.id).exec()
+        })
+        .then(function(user) {
+          user.username.should.equal(newUser.username);
+          //user.password.should.equal(newUser.password);
+          user.firstName.should.equal(newUser.firstName);
+          user.lastName.should.equal(newUser.lastName);
+        });
+    });
+
     it('should add a new blog post', function() {
 
       const newPost = {

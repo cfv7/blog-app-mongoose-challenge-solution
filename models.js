@@ -43,6 +43,7 @@ userSchema.statics.hashPassword = function(password) {
 
 userSchema.methods.apiRepr = function() {
   return {
+    id: this._id,
     username: this.username || '',
     firstName: this.firstName || '',
     lastName: this.lastName || ''

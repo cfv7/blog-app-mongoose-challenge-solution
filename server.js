@@ -42,6 +42,14 @@ app.get('/posts/:id',  auth, (req, res) => {
     });
 });
 
+app.get('/users', (req, res) => {
+  return User
+    .find()
+    .exec()
+    .then(users => res.json(users.map(user => user.apiRepr())))
+    .catch(err => console.log(err) && res.status(500).json({message: 'Internal server error 🐳'}))
+});
+
 app.post('/posts', auth, (req, res) => {
   const requiredFields = ['title', 'content', 'author'];
   for (let i=0; i<requiredFields.length; i++) {
@@ -75,7 +83,7 @@ const basicStrategy = new BasicStrategy((username, password, callback) => {
     .findOne({username: username})
     .exec()
     .then(_user => {
-      console.log("user", _user)
+      // console.log("user", _user)
       user = _user;
       if(!user) {
         return callback(null, false, {message: 'Incorrect username 🕵️‍'});
@@ -83,7 +91,7 @@ const basicStrategy = new BasicStrategy((username, password, callback) => {
       return user.validatePassword(password);
     })
     .then(isValid => {
-      console.log("isValid", isValid)
+      // console.log("isValid", isValid)
       if (!isValid) {
         return callback(null, false, {message: 'Incorrect password 🙅‍'});
       }
@@ -104,6 +112,28 @@ app.use(passport.initialize());
 app.post('/users', (req, res) => {
   let {username, password, firstName, lastName} = req.body;
 
+  if (!req.body) {
+    return res.status(400).json({message: 'No request body'});
+  }
+  if (!('username' in req.body)) {
+    return res.status(422).json({message: 'Missing field: username'});
+  }
+  if (typeof username !== 'string') {
+    return res.status(422).json({message: 'Incorrect field type: username'});
+  }
+  if (username === '') {
+    return res.status(422).json({message: 'Incorrect field length: username'});
+  }
+  if (!(password)) {
+    return res.status(422).json({message: 'Missing field: password'})
+  }
+  if (typeof password !== 'string') {
+    return res.status(422).json({message: 'Incorrect field type: password'});
+  }
+  if (password === '') {
+    return res.status(422).json({message: 'Incorrect field length: password'});
+  }
+
   User 
     // return User 
   .find({username})
@@ -114,7 +144,7 @@ app.post('/users', (req, res) => {
       return res.status(400).json({message: 'username taken 😞'})
     }
     return User.hashPassword(password)
-    console.log(password)
+    // console.log(password)
   })
   .then(hash => {
     return User
@@ -132,38 +162,8 @@ app.post('/users', (req, res) => {
     console.log(err);
     res.status(500).json({message: 'Internal server error 😌'})
   });
-
-  if (!req.body) {
-    return res.status(400).json({message: 'No request body'});
-  }
-  if (!('username' in req.body)) {
-    return res.status(422).json({message: 'Missing field: username'});
-  }
-  if (typeof username !== 'string') {
-    return res.status(422).json({message: 'Incorrect field type: username'});
-  }
-  console.log(username)
-  if (username === '') {
-    return res.status(422).json({message: 'Incorrect field length: username'});
-  }
-  if (!(password)) {
-    return res.status(422).json({message: 'Missing field: password'})
-  }
-  if (typeof password !== 'string') {
-    return res.status(422).json({message: 'Incorrect field type: password'});
-  }
-  if (password === '') {
-    return res.status(422).json({message: 'Incorrect field length: password'});
-  }
 });
 
-app.get('/users', (req, res) => {
-  return User
-    .find()
-    .exec()
-    .then(users => res.json(users.map(user => user.apiRepr())))
-    .catch(err => console.log(err) && res.status(500).json({message: 'Internal server error 🐳'}))
-});
 
 // app.get('/users/me', 
 //   passport.authenticate('basic', {session: false}),
